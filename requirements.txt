@@ -1,3 +1,5 @@
 garminconnect
 osmapi
 dotenv
+requests
+python-dotenv 
