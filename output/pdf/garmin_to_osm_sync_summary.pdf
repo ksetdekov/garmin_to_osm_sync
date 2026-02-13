@@ -1,0 +1,59 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 2741 >>
+stream
+BT /F1 16 Tf 1 0 0 1 54 742 Tm (Garmin to OSM Sync - One-Page App Summary) Tj ET
+BT /F1 12 Tf 1 0 0 1 54 720 Tm (What it is) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 702 Tm (A Python CLI that syncs Garmin Connect activities to OpenStreetMap as GPX traces.) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 688 Tm (It uses OSM OAuth2 tokens and a local SQLite record to prevent duplicate uploads.) Tj ET
+BT /F1 12 Tf 1 0 0 1 54 670 Tm (Who it is for) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 652 Tm (Primary persona: individual athletes/mappers using Garmin Connect who want OSM trace upload automation.) Tj ET
+BT /F1 12 Tf 1 0 0 1 54 634 Tm (What it does) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 616 Tm (- Loads Garmin and OSM settings from .env \(credentials, OAuth client, behavior flags\).) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 602 Tm (- Runs browser-based OSM OAuth2 authorization and stores tokens in tokens.json.) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 588 Tm (- Refreshes expired OSM access tokens automatically via refresh_token.) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 574 Tm (- Logs into Garmin Connect and fetches recent activities \(MAX_ACTIVITIES\).) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 560 Tm (- Downloads each new activity GPX into downloads/ for upload processing.) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 546 Tm (- Uploads GPX files to OSM /api/0.6/gpx/create with bearer authentication.) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 532 Tm (- Records processed activity IDs in data.db \(processed_activities\) to avoid re-uploads.) Tj ET
+BT /F1 12 Tf 1 0 0 1 54 514 Tm (How it works \(repo-evidence architecture\)) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 496 Tm (Components: main.py orchestrator; OAuth callback HTTP server; SQLite state store.) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 482 Tm (Services: Garmin Connect API \(garminconnect lib\), OSM OAuth2/token and GPX upload APIs.) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 468 Tm (Data flow: .env -> authorize/refresh -> fetch Garmin activities -> download GPX) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 454 Tm (           -> upload to OSM -> mark activity as processed in data.db -> delete temp GPX.) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 440 Tm (Not found in repo: packaged daemon/service deployment configuration.) Tj ET
+BT /F1 12 Tf 1 0 0 1 54 422 Tm (How to run \(minimal\)) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 404 Tm (1. cp env_example .env and fill GARMIN_EMAIL, GARMIN_PASSWORD, OSM_CLIENT_ID,) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 390 Tm (   OSM_CLIENT_SECRET, REDIRECT_URI \(README\).) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 376 Tm (2. python -m venv .venv && source .venv/bin/activate) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 362 Tm (3. pip install -r requirements.txt) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 348 Tm (4. python main.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 54 334 Tm (5. First run: approve OSM OAuth in browser; tokens are saved to tokens.json.) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3109
+%%EOF
