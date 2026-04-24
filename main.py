@@ -320,6 +320,11 @@ def add_processed_id(activity_id, gpx_id=None, status='uploaded', metadata=None)
 def main():
     parser = argparse.ArgumentParser(description="Garmin Connect -> OSM GPX sync")
     parser.add_argument("--history", action="store_true", help="Исторический режим: медленно, не более 5 активностей за запуск, увеличенный таймаут между запросами")
+    parser.add_argument(
+        "--keep-files",
+        action="store_true",
+        help="Не удалять скачанные GPX-файлы после обработки активности",
+    )
     args = parser.parse_args()
 
     logger.info("Starting Garmin->OSM sync (OAuth2)")
@@ -440,7 +445,9 @@ def main():
                 logger.exception("Error handling activity %s: %s", activity_id, e)
             finally:
                 try:
-                    if gpx_path.exists():
+                    if args.keep_files and gpx_path.exists():
+                        logger.info("Keeping downloaded file %s", gpx_path)
+                    elif gpx_path.exists():
                         gpx_path.unlink()
                 except Exception:
                     logger.exception("Failed to delete temporary file %s", gpx_path)
