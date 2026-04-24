@@ -39,6 +39,7 @@ from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlencode, parse_qs
 from datetime import datetime, timedelta, timezone
+import xml.etree.ElementTree as ET
 
 import requests
 import sqlite3
@@ -81,6 +82,19 @@ SCOPES = "read_gpx write_gpx"
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("garmin_osm_sync_oauth2")
+
+VIRTUAL_KEYWORDS = (
+    "virtual run",
+    "virtual ride",
+    "virtual",
+    "zwift",
+    "rouvy",
+    "trainerroad",
+    "bkool",
+    "mywhoosh",
+)
+GPX_POINT_TAGS = {"trkpt", "rtept", "wpt"}
+GPX_TEXT_TAGS = {"name", "desc", "type", "cmt"}
 
 # --- OAUTH2 LOCAL CALLBACK ---
 authorization_code = None
@@ -253,6 +267,87 @@ def upload_gpx_with_bearer(access_token: str, gpx_filepath: Path, description: s
         resp = requests.post(UPLOAD_URL, files=files, data=data, headers=headers, timeout=60)
     return resp
 
+
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join((value or "").lower().split())
+
+
+def classify_gpx_file(gpx_path: Path, activity=None):
+    activity = activity or {}
+    activity_type = (activity.get("activityType") or {}).get("typeKey") or "unknown"
+    classification = {
+        "classifier_version": 1,
+        "activity_name": activity.get("activityName"),
+        "activity_type": activity_type,
+        "gpx_name": None,
+        "gpx_type": None,
+        "gps_point_count": 0,
+        "has_gps_data": False,
+        "is_virtual": False,
+        "matched_keywords": [],
+        "status": "ready",
+        "reason": "ok",
+    }
+
+    try:
+        root = ET.parse(gpx_path).getroot()
+    except ET.ParseError as exc:
+        classification["status"] = "skipped_invalid_gpx"
+        classification["reason"] = f"Invalid GPX XML: {exc}"
+        return classification
+    except Exception as exc:
+        classification["status"] = "skipped_invalid_gpx"
+        classification["reason"] = f"Failed to read GPX: {exc}"
+        return classification
+
+    text_values = []
+
+    for elem in root.iter():
+        tag = _xml_local_name(elem.tag)
+        text = (elem.text or "").strip()
+
+        if tag in GPX_TEXT_TAGS and text:
+            if tag == "name" and not classification["gpx_name"]:
+                classification["gpx_name"] = text
+            elif tag == "type" and not classification["gpx_type"]:
+                classification["gpx_type"] = text
+            text_values.append(text)
+
+        if tag in GPX_POINT_TAGS and elem.attrib.get("lat") and elem.attrib.get("lon"):
+            classification["gps_point_count"] += 1
+
+    searchable_text = " ".join(
+        filter(
+            None,
+            [
+                classification["activity_name"],
+                classification["activity_type"],
+                classification["gpx_name"],
+                classification["gpx_type"],
+                *text_values,
+            ],
+        )
+    )
+    normalized_text = _normalize_text(searchable_text)
+    matched_keywords = [keyword for keyword in VIRTUAL_KEYWORDS if keyword in normalized_text]
+
+    classification["matched_keywords"] = matched_keywords
+    classification["has_gps_data"] = classification["gps_point_count"] > 0
+
+    if matched_keywords:
+        classification["is_virtual"] = True
+        classification["status"] = "skipped_virtual"
+        classification["reason"] = f"Matched virtual keyword(s): {', '.join(matched_keywords)}"
+    elif not classification["has_gps_data"]:
+        classification["status"] = "skipped_no_gps_data"
+        classification["reason"] = "GPX does not contain any GPS points"
+
+    return classification
+
 # --- File helpers ---
 
 DB_FILE = Path(os.getenv("DB_FILE", "data.db"))
@@ -376,7 +471,7 @@ def main():
                 continue
 
             name = activity.get("activityName") or f"Garmin Activity {activity_id}"
-            type_ = activity.get("activityType", {}).get("typeKey", "unknown")
+            type_ = (activity.get("activityType") or {}).get("typeKey", "unknown")
             start_time = activity.get("startTimeLocal") or activity.get("startTimeGMT") or "Unknown"
             gpx_path = DOWNLOAD_DIR / f"{activity_id}.gpx"
 
@@ -391,13 +486,31 @@ def main():
                 with gpx_path.open("wb") as f:
                     f.write(gpx_bytes)
 
+                classification = classify_gpx_file(gpx_path, activity)
+                if classification["status"] != "ready":
+                    logger.info(
+                        "Skipping activity %s (%s): %s [points=%s, gpx_name=%s, gpx_type=%s]",
+                        activity_id,
+                        classification["status"],
+                        classification["reason"],
+                        classification["gps_point_count"],
+                        classification["gpx_name"] or "-",
+                        classification["gpx_type"] or "-",
+                    )
+                    add_processed_id(activity_id, status=classification["status"], metadata=classification)
+                    consecutive_errors = 0
+                    if args.history:
+                        sleep_time = initial_sleep
+                    time.sleep(sleep_time)
+                    continue
+
                 desc = f"Garmin Activity: {name} on {start_time}"
                 tags = f"garmin,sync,{type_}"
                 visibility = "identifiable"
 
                 if DRY_RUN:
                     logger.info("Dry run: would upload %s", gpx_path)
-                    add_processed_id(activity_id)
+                    add_processed_id(activity_id, status="dry_run", metadata=classification)
                     # treat as success
                     consecutive_errors = 0
                     if args.history:
@@ -434,7 +547,7 @@ def main():
                         # success
                         gpx_id = resp.text.strip()
                         logger.info("Uploaded activity %s to OSM (gpx id=%s)", activity_id, gpx_id)
-                        add_processed_id(activity_id)
+                        add_processed_id(activity_id, gpx_id=gpx_id, status="uploaded", metadata=classification)
                         consecutive_errors = 0
                         if args.history:
                             sleep_time = initial_sleep
