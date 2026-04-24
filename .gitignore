@@ -208,3 +208,4 @@ __marimo__/
 processed_ids.txt
 tokens.json
 data.db
+.DS_Store
